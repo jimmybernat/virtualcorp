@@ -217,6 +217,139 @@ prepare_password_file() {
 
     log_ok "Contraseña temporal generada fuera del repositorio"
 }
+install_template() {
+    local vm_name="$1"
+    local preseed_file="$2"
+    local install_marker="${BUILD_DIR}/${vm_name}.install-started"
+    local auxiliary_path="${BUILD_DIR}/${vm_name}"
+
+    if [[ -f "${install_marker}" ]]; then
+        log_warn "La instalación de ${vm_name} ya fue iniciada"
+        return 0
+    fi
+
+    if [[ ! -f "${preseed_file}" ]]; then
+        log_err "No se encuentra el preseed: ${preseed_file}"
+        return 1
+    fi
+
+    mkdir -p "${auxiliary_path}"
+
+    log_info "Preparando la instalación desatendida de ${vm_name}..."
+
+    "${VBOXMANAGE_BIN}" unattended install "${vm_name}" \
+        --iso="${DEBIAN_ISO_PATH}" \
+        --user="sysadmin" \
+        --user-password-file="${TEMPLATE_PASSWORD_FILE}" \
+        --full-user-name="VirtualCorp Sysadmin" \
+        --locale="es_ES" \
+        --language="es" \
+        --country="ES" \
+        --time-zone="Europe/Madrid" \
+        --hostname="${vm_name}.virtualcorp.local" \
+        --package-selection-adjustment="minimal" \
+        --script-template="${preseed_file}" \
+        --post-install-template="${RENDERED_POSTINSTALL}" \
+        --auxiliary-base-path="${auxiliary_path}" \
+        --start-vm="headless" 2>&1 | \
+        sed -E \
+            -e 's/^([[:space:]]*password[[:space:]]*=).*/\1 [OCULTA]/' \
+            -e 's/^([[:space:]]*user-password[[:space:]]*=).*/\1 [OCULTA]/'\
+	    -e 's/^([[:space:]]*admin-password[[:space:]]*=).*/\1 [OCULTA]/'
+    touch "${install_marker}"
+    log_ok "Instalación desatendida de ${vm_name} iniciada"
+}
+wait_for_template_ssh() {
+    local vm_name="$1"
+    local ssh_port="$2"
+    local timeout_seconds="${DEBIAN_TEMPLATE_INSTALL_TIMEOUT:-2400}"
+    local elapsed=0
+
+    log_info "Esperando a que termine la instalación de ${vm_name}..."
+
+    while (( elapsed < timeout_seconds )); do
+        if ssh \
+            -p "${ssh_port}" \
+            -i "${SYSADMIN_PRIVATE_KEY_FILE}" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=5 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            sysadmin@127.0.0.1 true >/dev/null 2>&1; then
+
+            log_ok "SSH disponible en ${vm_name}"
+            return 0
+        fi
+
+        sleep 15
+        elapsed=$((elapsed + 15))
+    done
+
+    log_err "Tiempo agotado esperando a ${vm_name}"
+    return 1
+}
+wait_for_template_poweroff() {
+    local vm_name="$1"
+    local timeout_seconds=180
+    local elapsed=0
+    local vm_state
+
+    log_info "Esperando a que ${vm_name} se apague..."
+
+    while (( elapsed < timeout_seconds )); do
+        vm_state="$(
+            "${VBOXMANAGE_BIN}" showvminfo "${vm_name}" --machinereadable |
+                sed -n 's/^VMState="\([^"]*\)"/\1/p'
+        )"
+
+        if [[ "${vm_state}" == "poweroff" ]]; then
+            log_ok "${vm_name} está apagada"
+            return 0
+        fi
+
+        sleep 5
+        elapsed=$((elapsed + 5))
+    done
+
+    log_err "Tiempo agotado esperando el apagado de ${vm_name}"
+    return 1
+}
+finalize_template() {
+    local vm_name="$1"
+    local ssh_port="$2"
+    local snapshot_description="$3"
+
+    if "${VBOXMANAGE_BIN}" snapshot "${vm_name}" list --machinereadable 2>/dev/null |
+        grep -qE '^SnapshotName(-[0-9]+)?="base-clean"$'; then
+
+        log_ok "${vm_name} ya está finalizada y tiene la instantánea base-clean"
+        return 0
+    fi
+
+    wait_for_template_ssh "${vm_name}" "${ssh_port}"
+
+    log_info "Sellando la plantilla ${vm_name}..."
+
+    ssh \
+        -p "${ssh_port}" \
+        -i "${SYSADMIN_PRIVATE_KEY_FILE}" \
+        -o BatchMode=yes \
+        -o ConnectTimeout=5 \
+        -o StrictHostKeyChecking=no \
+        -o UserKnownHostsFile=/dev/null \
+        sysadmin@127.0.0.1 \
+        'sudo rm -f /etc/ssh/ssh_host_* /var/lib/dbus/machine-id /var/lib/systemd/random-seed /var/lib/dhcp/dhclient*.leases; printf "uninitialized\n" | sudo tee /etc/machine-id >/dev/null; sudo sync; sudo poweroff' \
+        || true
+
+    wait_for_template_poweroff "${vm_name}"
+
+    "${VBOXMANAGE_BIN}" modifyvm "${vm_name}" --nic1 none
+
+    "${VBOXMANAGE_BIN}" snapshot "${vm_name}" take "base-clean" \
+        --description "${snapshot_description}"
+
+    log_ok "Plantilla ${vm_name} sellada y preparada para clones enlazados"
+}
 check_requirements
 download_debian_iso
 render_postinstall
@@ -233,3 +366,23 @@ create_template_vm \
     "${DESKTOP_MEMORY_MB}" \
     128 \
     "${DESKTOP_SSH_PORT}"
+
+install_template \
+    "${SERVER_TEMPLATE_NAME}" \
+    "${SERVER_PRESEED}"
+
+install_template \
+    "${DESKTOP_TEMPLATE_NAME}" \
+    "${DESKTOP_PRESEED}"
+finalize_template \
+    "${SERVER_TEMPLATE_NAME}" \
+    "${SERVER_SSH_PORT}" \
+    "Debian Server 13 limpio y sellado"
+
+finalize_template \
+    "${DESKTOP_TEMPLATE_NAME}" \
+    "${DESKTOP_SSH_PORT}" \
+    "Debian Desktop 13 LXQt limpio y sellado"
+
+rm -f "${TEMPLATE_PASSWORD_FILE}"
+log_ok "Plantillas Debian creadas y preparadas correctamente"

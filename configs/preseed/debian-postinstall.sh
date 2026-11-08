@@ -24,4 +24,27 @@ sysadmin ALL=(ALL:ALL) NOPASSWD: ALL
 EOF_SUDO
 
 chmod 440 "${TARGET}/etc/sudoers.d/sysadmin"
+in-target passwd -l sysadmin
+
+cat > "${TARGET}/etc/default/keyboard" <<'EOF_KEYBOARD'
+XKBMODEL="pc105"
+XKBLAYOUT="es"
+XKBVARIANT=""
+XKBOPTIONS=""
+BACKSPACE="guess"
+EOF_KEYBOARD
+
+if [ -d "${TARGET}/etc/X11" ]; then
+    mkdir -p "${TARGET}/etc/X11/xorg.conf.d"
+
+    cat > "${TARGET}/etc/X11/xorg.conf.d/00-keyboard.conf" <<'EOF_XORG_KEYBOARD'
+Section "InputClass"
+    Identifier "system-keyboard"
+    MatchIsKeyboard "on"
+    Option "XkbModel" "pc105"
+    Option "XkbLayout" "es"
+EndSection
+EOF_XORG_KEYBOARD
+fi
+
 in-target systemctl enable ssh

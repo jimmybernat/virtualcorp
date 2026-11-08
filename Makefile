@@ -13,7 +13,7 @@ export VBOX_ROOT_GROUP VM_ROUTERS_GROUP VM_TEMPLATES_GROUP VBOXMANAGE_BIN
 BASH_DIR := $(PROJECT_ROOT)/infrastructure/bash
 BOOTSTRAP_DIR := $(PROJECT_ROOT)/automation/scripts/bootstrap
 
-.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box create_templates
+.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box create_templates deploy_equipment
 help:
 	@printf '%s\n' \
 	  'Targets:' \
@@ -44,3 +44,7 @@ routeros-box:
 	"$(BOOTSTRAP_DIR)/create_mikrotik_box.sh"
 create_templates:
 	"$(BASH_DIR)/create_templates.sh"
+
+deploy_equipment: create_templates
+	"$(BASH_DIR)/deploy_equipment.sh"
+	"$(BASH_DIR)/deploy_proxmox.sh"

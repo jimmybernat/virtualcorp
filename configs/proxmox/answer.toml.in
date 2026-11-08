@@ -1,0 +1,26 @@
+[global]
+keyboard = "es"
+country = "es"
+fqdn = "pve01.virtualcorp.local"
+mailto = "root@virtualcorp.local"
+timezone = "Europe/Madrid"
+
+root-password-hashed = "__ROOT_PASSWORD_HASH__"
+
+root-ssh-keys = [
+  "__AUDITOR_PUBLIC_KEY__",
+  "__SYSADMIN_PUBLIC_KEY__"
+]
+
+reboot-on-error = false
+
+[network]
+source = "from-answer"
+cidr = "10.21.0.133/26"
+gateway = "10.21.0.129"
+dns = "1.1.1.1"
+filter.ID_NET_NAME = "enp0s3"
+
+[disk-setup]
+filesystem = "ext4"
+disk-list = ["sda"]

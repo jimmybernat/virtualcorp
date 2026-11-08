@@ -13,8 +13,7 @@ export VBOX_ROOT_GROUP VM_ROUTERS_GROUP VM_TEMPLATES_GROUP VBOXMANAGE_BIN
 BASH_DIR := $(PROJECT_ROOT)/infrastructure/bash
 BOOTSTRAP_DIR := $(PROJECT_ROOT)/automation/scripts/bootstrap
 
-.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box
-
+.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box create_templates
 help:
 	@printf '%s\n' \
 	  'Targets:' \
@@ -22,7 +21,8 @@ help:
 	  '  delete-routers  Delete the router VM group' \
 	  '  reset-routers   Delete and redeploy the router VMs' \
 	  '  ssh-keys        Generate the project SSH keys' \
-	  '  routeros-box    Build the RouterOS Vagrant box'
+	  '  routeros-box    Build the RouterOS Vagrant box'\
+	  '  create_templates Create the Debian Server and Desktop templates'
 
 deploy-routers:
 	"$(BASH_DIR)/deploy_routers.sh"
@@ -42,3 +42,5 @@ ssh-keys:
 
 routeros-box:
 	"$(BOOTSTRAP_DIR)/create_mikrotik_box.sh"
+create_templates:
+	"$(BASH_DIR)/create_templates.sh"

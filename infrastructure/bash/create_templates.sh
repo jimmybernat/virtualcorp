@@ -23,6 +23,7 @@ POSTINSTALL_TEMPLATE="${PRESEED_DIR}/debian-postinstall.sh"
 
 BUILD_DIR="${ARTIFACTS_DIR}/build/templates"
 VM_BASE_DIR="${ARTIFACTS_DIR}/vms/templates"
+TEMPLATE_PASSWORD_FILE="${BUILD_DIR}/sysadmin-password"
 check_requirements() {
     log_info "Comprobando requisitos para crear los templates..."
 
@@ -141,6 +142,94 @@ render_postinstall() {
     RENDERED_POSTINSTALL="${rendered_postinstall}"
     log_ok "Postinstalador generado con las claves públicas SSH"
 }
+create_template_vm() {
+    local vm_name="$1"
+    local memory_mb="$2"
+    local video_memory_mb="$3"
+    local ssh_port="$4"
+    local disk_path="${VM_BASE_DIR}/${vm_name}/${vm_name}.vdi"
+
+    if "${VBOXMANAGE_BIN}" showvminfo "${vm_name}" >/dev/null 2>&1; then
+        log_warn "La máquina ${vm_name} ya existe; no se vuelve a crear"
+        return 0
+    fi
+
+    log_info "Creando la máquina virtual ${vm_name}..."
+
+    mkdir -p "${VM_BASE_DIR}"
+
+    "${VBOXMANAGE_BIN}" createvm \
+        --name "${vm_name}" \
+        --ostype "Debian_64" \
+        --groups "${VM_TEMPLATES_GROUP}" \
+        --basefolder "${VM_BASE_DIR}" \
+        --register
+
+    "${VBOXMANAGE_BIN}" modifyvm "${vm_name}" \
+        --memory "${memory_mb}" \
+        --cpus "${TEMPLATE_CPUS}" \
+        --vram "${video_memory_mb}" \
+        --graphicscontroller "vmsvga" \
+        --boot1 dvd \
+        --boot2 disk \
+        --boot3 none \
+        --boot4 none \
+        --nic1 nat \
+        --natpf1 "ssh,tcp,127.0.0.1,${ssh_port},,22"
+
+    "${VBOXMANAGE_BIN}" createmedium disk \
+        --filename "${disk_path}" \
+        --size "${TEMPLATE_DISK_MB}" \
+        --format VDI \
+        --variant Standard
+
+    "${VBOXMANAGE_BIN}" storagectl "${vm_name}" \
+        --name "SATA Controller" \
+        --add sata \
+        --controller IntelAhci \
+        --portcount 4 \
+        --bootable on
+
+    "${VBOXMANAGE_BIN}" storageattach "${vm_name}" \
+        --storagectl "SATA Controller" \
+        --port 0 \
+        --device 0 \
+        --type hdd \
+        --medium "${disk_path}"
+
+    log_ok "Máquina ${vm_name} creada correctamente"
+}
+prepare_password_file() {
+    mkdir -p "${BUILD_DIR}"
+
+    if [[ -s "${TEMPLATE_PASSWORD_FILE}" ]]; then
+        chmod 600 "${TEMPLATE_PASSWORD_FILE}"
+        log_ok "El archivo de contraseña temporal ya existe"
+        return 0
+    fi
+
+    log_info "Generando una contraseña temporal para sysadmin..."
+
+    (
+        umask 077
+        openssl rand -base64 24 > "${TEMPLATE_PASSWORD_FILE}"
+    )
+
+    log_ok "Contraseña temporal generada fuera del repositorio"
+}
 check_requirements
 download_debian_iso
 render_postinstall
+prepare_password_file
+
+create_template_vm \
+    "${SERVER_TEMPLATE_NAME}" \
+    "${SERVER_MEMORY_MB}" \
+    16 \
+    "${SERVER_SSH_PORT}"
+
+create_template_vm \
+    "${DESKTOP_TEMPLATE_NAME}" \
+    "${DESKTOP_MEMORY_MB}" \
+    128 \
+    "${DESKTOP_SSH_PORT}"

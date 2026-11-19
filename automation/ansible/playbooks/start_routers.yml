@@ -1,0 +1,14 @@
+---
+- name: Iniciar los routers de VirtualCorp
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Aplicar el rol de inicio a cada router
+      ansible.builtin.include_role:
+        name: start_vm
+      vars:
+        vm_name: "{{ router_vm }}"
+        vboxmanage_bin: "{{ hostvars['localhost']['vboxmanage_bin'] }}"
+      loop: "{{ mikrotik_routers }}"
+      loop_control:
+        loop_var: router_vm

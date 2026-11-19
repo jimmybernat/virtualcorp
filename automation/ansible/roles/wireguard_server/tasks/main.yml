@@ -1,0 +1,228 @@
+---
+- name: Comprobar que está disponible la clave pública del cliente
+  ansible.builtin.assert:
+    that:
+      - wireguard_client_public_key is defined
+      - wireguard_client_public_key | length > 0
+    fail_msg: "No se ha obtenido la clave pública del cliente WireGuard."
+
+- name: Consultar la interfaz WireGuard
+  community.routeros.command:
+    commands:
+      - "/interface wireguard print terse where name={{ wireguard_interface }}"
+  register: wireguard_interface_info
+  changed_when: false
+
+- name: Crear la interfaz WireGuard
+  community.routeros.command:
+    commands:
+      - >-
+        /interface wireguard add
+        name={{ wireguard_interface }}
+        listen-port={{ wireguard_listen_port }}
+        comment={{ wireguard_server_comment }}
+  when: wireguard_interface_info.stdout[0] | trim | length == 0
+  changed_when: true
+
+- name: Consultar la dirección de la interfaz WireGuard
+  community.routeros.command:
+    commands:
+      - "/ip address print terse where interface={{ wireguard_interface }}"
+  register: wireguard_address_info
+  changed_when: false
+
+- name: Asignar la dirección del servidor WireGuard
+  community.routeros.command:
+    commands:
+      - >-
+        /ip address add
+        address={{ wireguard_server_address }}
+        interface={{ wireguard_interface }}
+        comment={{ wireguard_server_comment }}
+  when: wireguard_server_address not in wireguard_address_info.stdout[0]
+  changed_when: true
+
+- name: Consultar los peers WireGuard existentes
+  community.routeros.command:
+    commands:
+      - "/interface wireguard peers print terse where interface={{ wireguard_interface }}"
+  register: wireguard_peer_info
+  changed_when: false
+
+- name: Registrar el cliente WireGuard
+  community.routeros.command:
+    commands:
+      - >-
+        /interface wireguard peers add
+        interface={{ wireguard_interface }}
+        public-key="{{ wireguard_client_public_key }}"
+        allowed-address={{ wireguard_client_allowed_address }}
+        comment={{ wireguard_peer_comment }}
+  when: wireguard_peer_comment not in wireguard_peer_info.stdout[0]
+  changed_when: true
+
+- name: Consultar la clave pública del servidor
+  community.routeros.command:
+    commands:
+      - "/interface wireguard print detail where name={{ wireguard_interface }}"
+  register: wireguard_server_info
+  changed_when: false
+
+- name: Guardar la clave pública del servidor
+  ansible.builtin.set_fact:
+    wireguard_server_public_key: >-
+      {{
+        (
+          wireguard_server_info.stdout[0]
+          | regex_findall('public-key="([^"]+)"')
+        )
+        | first
+      }}
+
+- name: Verificar la clave pública obtenida del servidor
+  ansible.builtin.assert:
+    that:
+      - wireguard_server_public_key is defined
+      - wireguard_server_public_key | length > 0
+    fail_msg: "No se ha podido extraer la clave pública de mikrotik0."
+
+- name: Comprobar la redistribución de redes conectadas mediante RIP
+  community.routeros.command:
+    commands:
+      - "/routing rip instance print detail"
+  register: wireguard_rip_info
+  changed_when: false
+
+- name: Verificar que RIP anuncia las redes conectadas
+  ansible.builtin.assert:
+    that:
+      - "'connected' in wireguard_rip_info.stdout[0]"
+    fail_msg: >-
+      RIP no está redistribuyendo las redes conectadas.
+      No se utilizará NAT como sustituto de la ruta de retorno.
+
+- name: Consultar la lista de redes autorizadas
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall address-list print terse
+        where list={{ wireguard_firewall_address_list }}
+  register: wireguard_authorized_info
+  changed_when: false
+
+- name: Añadir las redes autorizadas a la lista del firewall
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall address-list add
+        list={{ wireguard_firewall_address_list }}
+        address={{ item }}
+        comment=vcorp-wireguard-red-autorizada
+  loop: "{{ wireguard_authorized_networks }}"
+  when: >-
+    item not in
+    (wireguard_authorized_info.stdout[0] | replace('\n', ''))
+  changed_when: true
+
+- name: Consultar las reglas actuales del firewall
+  community.routeros.command:
+    commands:
+      - "/ip firewall filter print terse"
+  register: wireguard_firewall_info
+  changed_when: false
+
+- name: Permitir el puerto UDP de WireGuard
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall filter add
+        chain=input
+        action=accept
+        protocol=udp
+        dst-port={{ wireguard_listen_port }}
+        in-interface=ether1
+        comment={{ wireguard_input_comment }}
+  when: wireguard_input_comment not in wireguard_firewall_info.stdout[0]
+  changed_when: true
+
+- name: Permitir el acceso del cliente a la dirección del túnel
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall filter add
+        chain=input
+        action=accept
+        src-address={{ wireguard_network }}
+        in-interface={{ wireguard_interface }}
+        comment={{ wireguard_router_access_comment }}
+  when: wireguard_router_access_comment not in wireguard_firewall_info.stdout[0]
+  changed_when: true
+
+- name: Permitir el acceso a las redes autorizadas
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall filter add
+        chain=forward
+        action=accept
+        src-address={{ wireguard_network }}
+        dst-address-list={{ wireguard_firewall_address_list }}
+        in-interface={{ wireguard_interface }}
+        comment={{ wireguard_forward_allow_comment }}
+  when: wireguard_forward_allow_comment not in wireguard_firewall_info.stdout[0]
+  changed_when: true
+
+- name: Bloquear otros destinos desde la VPN
+  community.routeros.command:
+    commands:
+      - >-
+        /ip firewall filter add
+        chain=forward
+        action=drop
+        src-address={{ wireguard_network }}
+        in-interface={{ wireguard_interface }}
+        comment={{ wireguard_forward_drop_comment }}
+  when: wireguard_forward_drop_comment not in wireguard_firewall_info.stdout[0]
+  changed_when: true
+
+- name: Consultar los reenvíos NAT de VirtualBox
+  ansible.builtin.command:
+    argv:
+      - VBoxManage
+      - showvminfo
+      - "{{ wireguard_nat_vm }}"
+      - --machinereadable
+  delegate_to: localhost
+  register: wireguard_virtualbox_info
+  changed_when: false
+
+- name: Definir el reenvío UDP esperado
+  ansible.builtin.set_fact:
+    wireguard_nat_expected: >-
+      {{ wireguard_nat_rule_name }},udp,{{ wireguard_nat_host_ip }},
+      {{ wireguard_listen_port }},,{{ wireguard_listen_port }}
+
+- name: Comprobar que una regla existente no tenga valores incorrectos
+  ansible.builtin.assert:
+    that:
+      - >-
+        wireguard_nat_rule_name not in wireguard_virtualbox_info.stdout
+        or
+        wireguard_nat_expected | replace(' ', '') in wireguard_virtualbox_info.stdout
+    fail_msg: >-
+      Ya existe un reenvío de VirtualBox llamado
+      {{ wireguard_nat_rule_name }} con valores diferentes.
+
+- name: Crear el reenvío UDP de VirtualBox
+  ansible.builtin.command:
+    argv:
+      - VBoxManage
+      - controlvm
+      - "{{ wireguard_nat_vm }}"
+      - natpf1
+      - "{{ wireguard_nat_expected | replace(' ', '') }}"
+  delegate_to: localhost
+  when: >-
+    wireguard_nat_expected | replace(' ', '')
+    not in wireguard_virtualbox_info.stdout
+  changed_when: true

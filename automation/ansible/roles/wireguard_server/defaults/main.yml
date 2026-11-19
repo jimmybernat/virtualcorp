@@ -1,0 +1,7 @@
+---
+wireguard_server_comment: vcorp-wireguard-servidor
+wireguard_peer_comment: vcorp-wireguard-cliente
+wireguard_input_comment: vcorp-wireguard-entrada
+wireguard_router_access_comment: vcorp-wireguard-acceso-router
+wireguard_forward_allow_comment: vcorp-wireguard-permitido
+wireguard_forward_drop_comment: vcorp-wireguard-bloqueado

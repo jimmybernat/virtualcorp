@@ -1,0 +1,83 @@
+---
+- name: Preparar las claves del cliente WireGuard
+  when: wireguard_client_phase == "keys"
+  delegate_to: localhost
+  block:
+    - name: Crear el directorio local protegido
+      ansible.builtin.file:
+        path: "{{ wireguard_artifacts_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Comprobar si ya existe la clave privada del cliente
+      ansible.builtin.stat:
+        path: "{{ wireguard_client_private_key_file }}"
+      register: wireguard_client_private_stat
+
+    - name: Generar la clave privada del cliente
+      ansible.builtin.command:
+        argv:
+          - wg
+          - genkey
+      register: wireguard_client_private_generated
+      when: not wireguard_client_private_stat.stat.exists
+      changed_when: true
+      no_log: true
+
+    - name: Guardar la clave privada del cliente
+      ansible.builtin.copy:
+        content: "{{ wireguard_client_private_generated.stdout }}\n"
+        dest: "{{ wireguard_client_private_key_file }}"
+        mode: "0600"
+      when: not wireguard_client_private_stat.stat.exists
+      no_log: true
+
+    - name: Leer la clave privada del cliente
+      ansible.builtin.slurp:
+        src: "{{ wireguard_client_private_key_file }}"
+      register: wireguard_client_private_file
+      no_log: true
+
+    - name: Guardar la clave privada en una variable temporal
+      ansible.builtin.set_fact:
+        wireguard_client_private_key: >-
+          {{ wireguard_client_private_file.content | b64decode | trim }}
+      no_log: true
+
+    - name: Derivar la clave pública del cliente
+      ansible.builtin.command:
+        argv:
+          - wg
+          - pubkey
+        stdin: "{{ wireguard_client_private_key }}"
+      register: wireguard_client_public_generated
+      changed_when: false
+      no_log: true
+
+    - name: Guardar la clave pública del cliente
+      ansible.builtin.copy:
+        content: "{{ wireguard_client_public_generated.stdout }}\n"
+        dest: "{{ wireguard_client_public_key_file }}"
+        mode: "0644"
+
+    - name: Guardar la clave pública en una variable
+      ansible.builtin.set_fact:
+        wireguard_client_public_key: "{{ wireguard_client_public_generated.stdout | trim }}"
+
+- name: Generar la configuración del cliente WireGuard
+  when: wireguard_client_phase == "config"
+  delegate_to: localhost
+  block:
+    - name: Comprobar que se ha obtenido la clave pública del servidor
+      ansible.builtin.assert:
+        that:
+          - wireguard_server_public_key is defined
+          - wireguard_server_public_key | length > 0
+        fail_msg: "No se ha obtenido la clave pública del servidor WireGuard."
+
+    - name: Crear el archivo de configuración del cliente
+      ansible.builtin.template:
+        src: client.conf.j2
+        dest: "{{ wireguard_client_config_file }}"
+        mode: "0600"
+      no_log: true

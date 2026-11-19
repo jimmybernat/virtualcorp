@@ -1,0 +1,21 @@
+---
+- name: Configurar la VPN WireGuard de VirtualCorp
+  hosts: mikrotik0
+  gather_facts: false
+
+  tasks:
+    - name: Generar o leer las claves del cliente
+      ansible.builtin.include_role:
+        name: wireguard_client
+      vars:
+        wireguard_client_phase: keys
+
+    - name: Configurar el servidor WireGuard en mikrotik0
+      ansible.builtin.include_role:
+        name: wireguard_server
+
+    - name: Generar el archivo de configuración del cliente
+      ansible.builtin.include_role:
+        name: wireguard_client
+      vars:
+        wireguard_client_phase: config

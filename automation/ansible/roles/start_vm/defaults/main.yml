@@ -1,0 +1,3 @@
+vboxmanage_bin: VBoxManage
+vm_name: ""
+vm_start_type: headless

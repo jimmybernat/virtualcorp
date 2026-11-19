@@ -1,0 +1,33 @@
+---
+# Interfaz y direccionamiento del túnel
+wireguard_interface: wg-vcorp
+wireguard_network: 10.21.10.0/24
+wireguard_server_address: 10.21.10.1/24
+wireguard_client_address: 10.21.10.2/24
+wireguard_client_allowed_address: 10.21.10.2/32
+
+# Puerto y endpoint para la prueba local
+wireguard_listen_port: 51820
+wireguard_endpoint_host: 127.0.0.1
+
+# Reenvío UDP de VirtualBox
+wireguard_nat_vm: mikrotik0
+wireguard_nat_rule_name: vcorp-wireguard
+wireguard_nat_host_ip: 127.0.0.1
+
+# Archivos locales protegidos y excluidos de Git
+wireguard_artifacts_dir: "{{ playbook_dir }}/../../../artifacts/vpn"
+wireguard_client_private_key_file: "{{ wireguard_artifacts_dir }}/client_private.key"
+wireguard_client_public_key_file: "{{ wireguard_artifacts_dir }}/client_public.key"
+wireguard_client_config_file: "{{ wireguard_artifacts_dir }}/vcorp-client.conf"
+
+# Lista utilizada por el firewall y por AllowedIPs
+wireguard_authorized_networks:
+  - 10.21.0.0/25
+  - 10.21.0.128/26
+  - 10.21.1.0/24
+  - 10.21.2.0/24
+  - 10.21.3.0/25
+  - 10.21.3.128/25
+
+wireguard_firewall_address_list: vcorp-vpn-authorized

@@ -1,0 +1,27 @@
+---
+- name: Comprobar que se ha indicado la máquina virtual
+  ansible.builtin.assert:
+    that:
+      - vm_name | length > 0
+    fail_msg: "Es necesario indicar vm_name."
+
+- name: Consultar el estado de la máquina virtual
+  ansible.builtin.command:
+    argv:
+      - "{{ vboxmanage_bin }}"
+      - showvminfo
+      - "{{ vm_name }}"
+      - --machinereadable
+  register: vm_info
+  changed_when: false
+
+- name: Iniciar la máquina si no está en ejecución
+  ansible.builtin.command:
+    argv:
+      - "{{ vboxmanage_bin }}"
+      - startvm
+      - "{{ vm_name }}"
+      - --type
+      - "{{ vm_start_type }}"
+  when: "'VMState=\"running\"' not in vm_info.stdout"
+  changed_when: true

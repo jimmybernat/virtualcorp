@@ -1,0 +1,4 @@
+vboxmanage_bin: VBoxManage
+vm_name: ""
+vm_shutdown_retries: 30
+vm_shutdown_delay: 2

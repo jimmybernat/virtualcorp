@@ -1,0 +1,9 @@
+[Interface]
+PrivateKey = {{ wireguard_client_private_key }}
+Address = {{ wireguard_client_address }}
+
+[Peer]
+PublicKey = {{ wireguard_server_public_key }}
+Endpoint = {{ wireguard_endpoint_host }}:{{ wireguard_listen_port }}
+AllowedIPs = {{ ([wireguard_network] + wireguard_authorized_networks) | join(', ') }}
+PersistentKeepalive = 25

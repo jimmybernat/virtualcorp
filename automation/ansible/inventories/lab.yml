@@ -14,9 +14,34 @@ all:
     routeros:
       hosts:
         mikrotik0:
-          ansible_connection: ansible.netcommon.network_cli
-          ansible_network_os: community.routeros.routeros
           ansible_host: 127.0.0.1
           ansible_port: 2200
-          ansible_user: sysadmin
+
+        mikrotik1:
+          ansible_host: 10.21.0.226
+          ansible_port: 22
+          ansible_paramiko_proxy_command: "ssh -W %h:%p -q mikrotik0"
+
+        mikrotik2:
+          ansible_host: 10.21.0.230
+          ansible_port: 22
+          ansible_paramiko_proxy_command: "ssh -W %h:%p -q mikrotik1"
+
+        mikrotik3:
+          ansible_host: 10.21.0.234
+          ansible_port: 22
+          ansible_paramiko_proxy_command: "ssh -W %h:%p -q mikrotik2"
+
+      vars:
+        ansible_connection: ansible.netcommon.network_cli
+        ansible_network_os: community.routeros.routeros
+        ansible_user: sysadmin
+        ansible_ssh_private_key_file: /home/jimmy/.ssh/vcorp_sysadmin
+
+    servidores_dhcp:
+      hosts:
+        dhcp01:
+          ansible_host: 10.21.0.136
+          ansible_user: root
           ansible_ssh_private_key_file: /home/jimmy/.ssh/vcorp_sysadmin
+          ansible_python_interpreter: /usr/bin/python3

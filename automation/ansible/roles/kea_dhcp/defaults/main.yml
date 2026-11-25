@@ -1,0 +1,11 @@
+---
+kea_paquete: kea-dhcp4-server
+kea_servicio: kea-dhcp4-server
+kea_archivo_configuracion: /etc/kea/kea-dhcp4.conf
+
+kea_interfaz: eth0
+kea_tiempo_concesion: 3600
+
+kea_dns: []
+kea_dominio: ""
+kea_subredes: []

@@ -1,0 +1,73 @@
+---
+- name: Comprobar que existen relés DHCP definidos
+  ansible.builtin.assert:
+    that:
+      - dhcp_relay_server | length > 0
+      - dhcp_relays | length > 0
+    fail_msg: No se ha definido completamente la configuración de los relés DHCP
+
+- name: Contar los relés DHCP existentes
+  community.routeros.command:
+    commands:
+      - ':put [:len [/ip dhcp-relay find where name="{{ item.nombre }}"]]'
+  loop: "{{ dhcp_relays }}"
+  loop_control:
+    label: "{{ item.nombre }}"
+  register: dhcp_relay_existentes
+  changed_when: false
+
+- name: Comprobar que no existen relés DHCP duplicados
+  ansible.builtin.assert:
+    that:
+      - (item.stdout[0].splitlines() | last | trim | int) <= 1
+    fail_msg: "Existe más de un relay llamado {{ item.item.nombre }}"
+  loop: "{{ dhcp_relay_existentes.results }}"
+  loop_control:
+    label: "{{ item.item.nombre }}"
+
+- name: Crear los relés DHCP que no existen
+  community.routeros.command:
+    commands:
+      - >-
+        /ip dhcp-relay add
+        name="{{ item.item.nombre }}"
+        interface="{{ item.item.interfaz }}"
+        dhcp-server="{{ dhcp_relay_server }}"
+        local-address="{{ item.item.direccion_local }}"
+        disabled=no
+  loop: "{{ dhcp_relay_existentes.results }}"
+  loop_control:
+    label: "{{ item.item.nombre }}"
+  when: (item.stdout[0].splitlines() | last | trim | int) == 0
+
+- name: Consultar la configuración actual de los relés DHCP
+  community.routeros.command:
+    commands:
+      - ':put [/ip dhcp-relay get [find where name="{{ item.nombre }}"] interface]'
+      - ':put [/ip dhcp-relay get [find where name="{{ item.nombre }}"] dhcp-server]'
+      - ':put [/ip dhcp-relay get [find where name="{{ item.nombre }}"] local-address]'
+      - ':put [/ip dhcp-relay get [find where name="{{ item.nombre }}"] disabled]'
+  loop: "{{ dhcp_relays }}"
+  loop_control:
+    label: "{{ item.nombre }}"
+  register: dhcp_relay_configuracion
+  changed_when: false
+
+- name: Corregir los relés DHCP con valores diferentes
+  community.routeros.command:
+    commands:
+      - >-
+        /ip dhcp-relay set
+        [find where name="{{ item.item.nombre }}"]
+        interface="{{ item.item.interfaz }}"
+        dhcp-server="{{ dhcp_relay_server }}"
+        local-address="{{ item.item.direccion_local }}"
+        disabled=no
+  loop: "{{ dhcp_relay_configuracion.results }}"
+  loop_control:
+    label: "{{ item.item.nombre }}"
+  when: >
+    (item.stdout[0].splitlines() | last | trim) != item.item.interfaz or
+    (item.stdout[1].splitlines() | last | trim) != dhcp_relay_server or
+    (item.stdout[2].splitlines() | last | trim) != item.item.direccion_local or
+    (item.stdout[3].splitlines() | last | trim) != "false"

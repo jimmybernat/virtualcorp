@@ -1,0 +1,58 @@
+{
+  "Dhcp4": {
+    "interfaces-config": {
+      "interfaces": [ "{{ kea_interfaz }}" ],
+      "service-sockets-max-retries": 12,
+      "service-sockets-retry-wait-time": 5000
+    },
+
+    "lease-database": {
+      "type": "memfile",
+      "persist": true
+    },
+
+    "valid-lifetime": {{ kea_tiempo_concesion }},
+
+    "subnet4": [
+{% for red in kea_subredes %}
+      {
+        "id": {{ red.id }},
+        "subnet": "{{ red.subred }}",
+
+        "pools": [
+          {
+            "pool": "{{ red.pool }}"
+          }
+        ],
+
+        "option-data": [
+          {
+            "name": "routers",
+            "data": "{{ red.gateway }}"
+          },
+          {
+            "name": "domain-name-servers",
+            "data": "{{ kea_dns | join(', ') }}"
+          },
+          {
+            "name": "domain-name",
+            "data": "{{ kea_dominio }}"
+          }
+        ],
+
+        "reservations-out-of-pool": true,
+
+        "reservations": [
+{% for reserva in red.reservas %}
+          {
+            "hostname": "{{ reserva.hostname }}",
+            "hw-address": "{{ reserva.mac }}",
+            "ip-address": "{{ reserva.ip }}"
+          }{% if not loop.last %},{% endif %}
+{% endfor %}
+        ]
+      }{% if not loop.last %},{% endif %}
+{% endfor %}
+    ]
+  }
+}

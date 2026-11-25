@@ -1,0 +1,5 @@
+---
+dhcp_relays:
+  - nombre: vcorp-dmz
+    interfaz: ether3
+    direccion_local: 10.21.0.193

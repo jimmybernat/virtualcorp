@@ -1,0 +1,30 @@
+---
+- name: Comprobar que existen subredes DHCP
+  ansible.builtin.assert:
+    that:
+      - kea_subredes | length > 0
+      - kea_dns | length > 0
+      - kea_dominio | length > 0
+    fail_msg: No se ha definido completamente el direccionamiento DHCP
+
+- name: Instalar el servidor Kea DHCPv4
+  ansible.builtin.apt:
+    name: "{{ kea_paquete }}"
+    state: present
+    update_cache: true
+
+- name: Generar y validar la configuración de Kea DHCPv4
+  ansible.builtin.template:
+    src: kea-dhcp4.conf.j2
+    dest: "{{ kea_archivo_configuracion }}"
+    owner: root
+    group: root
+    mode: "0644"
+    validate: "/usr/sbin/kea-dhcp4 -t %s"
+  notify: Reiniciar Kea DHCPv4
+
+- name: Habilitar e iniciar Kea DHCPv4
+  ansible.builtin.service:
+    name: "{{ kea_servicio }}"
+    enabled: true
+    state: started

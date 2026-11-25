@@ -12,8 +12,10 @@ export VBOX_ROOT_GROUP VM_ROUTERS_GROUP VM_TEMPLATES_GROUP VBOXMANAGE_BIN
 
 BASH_DIR := $(PROJECT_ROOT)/infrastructure/bash
 BOOTSTRAP_DIR := $(PROJECT_ROOT)/automation/scripts/bootstrap
+TERRAFORM_DHCP_DIR := $(PROJECT_ROOT)/infrastructure/terraform/proxmox
+ANSIBLE_DIR := $(PROJECT_ROOT)/automation/ansible
 
-.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box create_templates deploy_equipment
+.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box create_templates deploy_equipment deploy_dhcp
 help:
 	@printf '%s\n' \
 	  'Targets:' \
@@ -22,7 +24,8 @@ help:
 	  '  reset-routers   Delete and redeploy the router VMs' \
 	  '  ssh-keys        Generate the project SSH keys' \
 	  '  routeros-box    Build the RouterOS Vagrant box'\
-	  '  create_templates Create the Debian Server and Desktop templates'
+	  '  create_templates Create the Debian Server and Desktop templates'\
+	  '  deploy_dhcp     Deploy dhcp01, Kea DHCP and RouterOS relays'
 
 deploy-routers:
 	"$(BASH_DIR)/deploy_routers.sh"
@@ -48,3 +51,12 @@ create_templates:
 deploy_equipment: create_templates
 	"$(BASH_DIR)/deploy_equipment.sh"
 	"$(BASH_DIR)/deploy_proxmox.sh"
+deploy_dhcp:
+	terraform -chdir="$(TERRAFORM_DHCP_DIR)" init
+	terraform -chdir="$(TERRAFORM_DHCP_DIR)" fmt -check -recursive
+	terraform -chdir="$(TERRAFORM_DHCP_DIR)" validate
+	terraform -chdir="$(TERRAFORM_DHCP_DIR)" plan -var-file=terraform.local.tfvars
+	terraform -chdir="$(TERRAFORM_DHCP_DIR)" apply -var-file=terraform.local.tfvars
+	cd "$(ANSIBLE_DIR)" && ansible-galaxy collection install -r requirements.yml
+	cd "$(ANSIBLE_DIR)" && ansible-playbook --syntax-check playbooks/configure_dhcp_dns.yml
+	cd "$(ANSIBLE_DIR)" && ansible-playbook playbooks/configure_dhcp_dns.yml

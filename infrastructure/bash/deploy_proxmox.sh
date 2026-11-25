@@ -160,6 +160,7 @@ create_pve_vm() {
         --nic1=intnet \
         --intnet1="${PVE_NETWORK}" \
         --nictype1=82540EM \
+        --nic-promisc1=allow-all \
         --cableconnected1=on \
         --nic2=none \
         --nic3=none \

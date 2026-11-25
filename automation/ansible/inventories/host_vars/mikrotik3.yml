@@ -1,0 +1,10 @@
+---
+dhcp_relays:
+  - nombre: vcorp-planta03
+    interfaz: ether3
+    direccion_local: 10.21.3.1
+
+  - nombre: vcorp-direccion
+    interfaz: ether4
+    direccion_local: 10.21.3.129
+

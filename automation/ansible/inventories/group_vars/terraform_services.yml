@@ -1,0 +1,10 @@
+---
+# Los hosts sin ansible_host estático obtienen su dirección de la lista
+# terraform_service_ip_assignments.
+ansible_host: >-
+  {{
+    terraform_service_ip_assignments
+    | selectattr('hostname', 'equalto', inventory_hostname)
+    | map(attribute='ip_address')
+    | first
+  }}

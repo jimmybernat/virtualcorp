@@ -1,0 +1,23 @@
+$TTL {{ bind_zone_ttl }}
+
+@ IN SOA {{ zone.primary_ns }} {{ zone.admin }} (
+  {{ bind_zone_serial }} ; serial
+  {{ bind_soa_refresh }} ; refresh
+  {{ bind_soa_retry }} ; retry
+  {{ bind_soa_expire }} ; expire
+  {{ bind_soa_negative_ttl }} ; negative cache TTL
+)
+
+@ IN NS {{ zone.primary_ns }}
+
+{% for delegation in zone.delegated_zones | default([]) %}
+{{ delegation.name }} IN NS {{ delegation.target }}
+{% endfor %}
+
+{% for record in zone.a_records | default([]) %}
+{{ record.name }} IN A {{ record.address }}
+{% endfor %}
+
+{% for record in zone.cname_records | default([]) %}
+{{ record.name }} IN CNAME {{ record.target }}
+{% endfor %}

@@ -1,0 +1,89 @@
+---
+- name: Iniciar Proxmox y la VPN de VirtualCorp
+  hosts: localhost
+  gather_facts: false
+
+  vars:
+    pve_vm_name: pve01
+    pve_ssh_host: root@10.21.0.133
+    wireguard_client_name: >-
+      {{
+        wireguard_client_config_file
+        | basename
+        | regex_replace('\.conf$', '')
+      }}
+
+  tasks:
+    - name: Iniciar la máquina virtual pve01
+      ansible.builtin.include_role:
+        name: start_vm
+      vars:
+        vm_name: "{{ pve_vm_name }}"
+        vboxmanage_bin: "{{ hostvars['localhost']['vboxmanage_bin'] }}"
+
+    - name: Comprobar que existe la configuración WireGuard
+      ansible.builtin.stat:
+        path: "{{ wireguard_client_config_file }}"
+      register: wireguard_config
+
+    - name: Validar el archivo de configuración WireGuard
+      ansible.builtin.assert:
+        that:
+          - wireguard_config.stat.exists
+          - wireguard_config.stat.isreg
+        fail_msg: >-
+          No existe {{ wireguard_client_config_file }}.
+          Ejecuta primero playbooks/configure_wireguard.yml.
+
+    - name: Consultar las interfaces WireGuard activas
+      ansible.builtin.command:
+        argv:
+          - wg
+          - show
+          - interfaces
+      become: true
+      register: wireguard_interfaces
+      changed_when: false
+
+    - name: Levantar el cliente WireGuard
+      ansible.builtin.command:
+        argv:
+          - wg-quick
+          - up
+          - "{{ wireguard_client_config_file }}"
+      become: true
+      when: wireguard_client_name not in wireguard_interfaces.stdout.split()
+      changed_when: true
+
+    - name: Esperar a que pve01 acepte conexiones SSH
+      ansible.builtin.command:
+        argv:
+          - ssh
+          - -o
+          - BatchMode=yes
+          - -o
+          - ConnectTimeout=5
+          - -J
+          - mikrotik0
+          - -i
+          - /home/jimmy/.ssh/vcorp_sysadmin
+          - "{{ pve_ssh_host }}"
+          - "true"
+      register: pve_ssh
+      until: pve_ssh.rc == 0
+      retries: 30
+      delay: 5
+      changed_when: false
+
+    - name: Comprobar el túnel WireGuard
+      ansible.builtin.command:
+        argv:
+          - ping
+          - -c
+          - "3"
+          - 10.21.10.1
+      register: wireguard_ping
+      until: wireguard_ping.rc == 0
+      retries: 12
+      delay: 5
+      changed_when: false

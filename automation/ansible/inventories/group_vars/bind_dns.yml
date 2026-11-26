@@ -1,0 +1,80 @@
+---
+bind_external_domain: jq-virtualcorp.com
+bind_internal_domain: jq-virtualcorp.lan
+
+bind_trusted_networks:
+  - 10.21.0.0/25
+  - 10.21.0.128/26
+  - 10.21.0.192/27
+  - 10.21.1.0/24
+  - 10.21.2.0/24
+  - 10.21.3.0/25
+  - 10.21.3.128/25
+  - 10.21.10.0/24
+
+bind_zones:
+  - name: jq-virtualcorp.com
+    filename: db.jq-virtualcorp.com
+    primary_ns: dns01.jq-virtualcorp.com.
+    admin: hostmaster.jq-virtualcorp.com.
+    a_records:
+      - { name: dns01, address: "10.21.0.137" }
+      - { name: websrv, address: "10.21.0.197" }
+    cname_records:
+      - { name: www, target: websrv.jq-virtualcorp.com. }
+
+  - name: jq-virtualcorp.lan
+    filename: db.jq-virtualcorp.lan
+    primary_ns: dns01.jq-virtualcorp.lan.
+    admin: hostmaster.jq-virtualcorp.lan.
+    a_records:
+      - { name: pve01, address: "10.21.0.133" }
+      - { name: dbsrv, address: "10.21.0.134" }
+      - { name: infosrv, address: "10.21.0.135" }
+      - { name: dhcp01, address: "10.21.0.136" }
+      - { name: dns01, address: "10.21.0.137" }
+      - { name: websrv, address: "10.21.0.197" }
+    cname_records:
+      - { name: printer0, target: printer.planta00.jq-virtualcorp.lan. }
+      - { name: printer1, target: printer.planta01.jq-virtualcorp.lan. }
+      - { name: printer2, target: printer.planta02.jq-virtualcorp.lan. }
+      - { name: printer3, target: printer.planta03.jq-virtualcorp.lan. }
+    delegated_zones:
+      - { name: planta00, target: dns01.jq-virtualcorp.lan. }
+      - { name: planta01, target: dns01.jq-virtualcorp.lan. }
+      - { name: planta02, target: dns01.jq-virtualcorp.lan. }
+      - { name: planta03, target: dns01.jq-virtualcorp.lan. }
+
+  - name: planta00.jq-virtualcorp.lan
+    filename: db.planta00.jq-virtualcorp.lan
+    primary_ns: dns01.jq-virtualcorp.lan.
+    admin: hostmaster.jq-virtualcorp.lan.
+    a_records:
+      - { name: printer, address: "10.21.0.10" }
+
+  - name: planta01.jq-virtualcorp.lan
+    filename: db.planta01.jq-virtualcorp.lan
+    primary_ns: dns01.jq-virtualcorp.lan.
+    admin: hostmaster.jq-virtualcorp.lan.
+    a_records:
+      - { name: printer, address: "10.21.1.20" }
+      - { name: prj1-web, address: "10.21.1.10" }
+      - { name: prj1-data, address: "10.21.1.11" }
+      - { name: prj2-web, address: "10.21.1.12" }
+      - { name: prj2-data, address: "10.21.1.13" }
+
+  - name: planta02.jq-virtualcorp.lan
+    filename: db.planta02.jq-virtualcorp.lan
+    primary_ns: dns01.jq-virtualcorp.lan.
+    admin: hostmaster.jq-virtualcorp.lan.
+    a_records:
+      - { name: printer, address: "10.21.2.20" }
+      - { name: prj3-web, address: "10.21.2.10" }
+      - { name: prj3-data, address: "10.21.2.11" }
+
+  - name: planta03.jq-virtualcorp.lan
+    filename: db.planta03.jq-virtualcorp.lan
+    primary_ns: dns01.jq-virtualcorp.lan.
+    admin: hostmaster.jq-virtualcorp.lan.
+    a_records:
+      - { name: printer, address: "10.21.3.10" }

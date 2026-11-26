@@ -1,5 +1,5 @@
 ---
-- name: Comprobar que existen subredes DHCP
+- name: Comprobar la configuración general de DHCP
   ansible.builtin.assert:
     that:
       - kea_subredes | length > 0
@@ -7,11 +7,130 @@
       - kea_dominio | length > 0
     fail_msg: No se ha definido completamente el direccionamiento DHCP
 
+- name: Comprobar que existe el grupo de servicios Terraform
+  ansible.builtin.assert:
+    that:
+      - "'terraform_services' in groups"
+      - groups["terraform_services"] | length > 0
+      - terraform_service_ip_assignments is defined
+    fail_msg: No se ha generado correctamente el inventario de servicios Terraform
+
+- name: Inicializar las reservas de servicios Terraform
+  ansible.builtin.set_fact:
+    kea_terraform_reservations: []
+
+- name: Validar los datos de cada servicio Terraform
+  ansible.builtin.assert:
+    that:
+      - hostvars[item].vcorp_mac_address is defined
+      - hostvars[item].vcorp_mac_address | length > 0
+      - hostvars[item].vcorp_network is defined
+      - hostvars[item].vcorp_network | length > 0
+      - >-
+        (hostvars[item].vcorp_ipv4_cidr is defined)
+        or
+        (service_ip_assignments | length == 1)
+    fail_msg: "El servicio {{ item }} no tiene MAC, red o una única dirección resuelta"
+  vars:
+    service_ip_assignments: >-
+      {{
+        terraform_service_ip_assignments
+        | selectattr("hostname", "equalto", item)
+        | list
+      }}
+  loop: "{{ groups['terraform_services'] }}"
+
+- name: Construir las reservas de los servicios Terraform
+  ansible.builtin.set_fact:
+    kea_terraform_reservations: >-
+      {{
+        kea_terraform_reservations
+        + [
+            {
+              "hostname": item,
+              "mac": hostvars[item].vcorp_mac_address,
+              "ip": (
+                hostvars[item].vcorp_ipv4_cidr
+                | regex_replace("/.*$", "")
+              )
+              if hostvars[item].vcorp_ipv4_cidr is defined
+              else
+              (
+                service_ip_assignments
+                | map(attribute="ip_address")
+                | first
+              ),
+              "network": hostvars[item].vcorp_network
+            }
+          ]
+      }}
+  vars:
+    service_ip_assignments: >-
+      {{
+        terraform_service_ip_assignments
+        | selectattr("hostname", "equalto", item)
+        | list
+      }}
+  loop: "{{ groups['terraform_services'] }}"
+
+- name: Comprobar que las direcciones Terraform son únicas
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          kea_terraform_reservations
+          | map(attribute="ip")
+          | list
+          | unique
+          | list
+          | length
+        )
+        ==
+        (kea_terraform_reservations | length)
+      - >-
+        (
+          kea_terraform_reservations
+          | map(attribute="mac")
+          | list
+          | unique
+          | list
+          | length
+        )
+        ==
+        (kea_terraform_reservations | length)
+    fail_msg: Hay direcciones IP o MAC duplicadas entre los servicios Terraform
+
+- name: Comprobar la red de cada reserva Terraform
+  ansible.builtin.assert:
+    that:
+      - item.network in (kea_subredes | map(attribute="nombre") | list)
+    fail_msg: "La red {{ item.network }} de {{ item.hostname }} no existe en kea_subredes"
+  loop: "{{ kea_terraform_reservations }}"
+  loop_control:
+    label: "{{ item.hostname }}"
+
 - name: Instalar el servidor Kea DHCPv4
   ansible.builtin.apt:
     name: "{{ kea_paquete }}"
     state: present
     update_cache: true
+
+- name: Crear el directorio de configuración adicional de Kea
+  ansible.builtin.file:
+    path: /etc/systemd/system/kea-dhcp4-server.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Esperar a que la red esté disponible antes de iniciar Kea
+  ansible.builtin.template:
+    src: network-ready.conf.j2
+    dest: /etc/systemd/system/kea-dhcp4-server.service.d/network-ready.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reiniciar Kea DHCPv4
 
 - name: Generar y validar la configuración de Kea DHCPv4
   ansible.builtin.template:

@@ -1,0 +1,50 @@
+acl vcorp_trusted {
+  localhost;
+{% for network in bind_trusted_networks %}
+  {{ network }};
+{% endfor %}
+};
+
+options {
+  directory "/var/cache/bind";
+
+  listen-on port 53 {
+    127.0.0.1;
+    {{ bind_listen_ipv4 }};
+  };
+
+  listen-on-v6 {
+    none;
+  };
+
+  allow-query {
+    vcorp_trusted;
+  };
+
+  recursion yes;
+
+  allow-recursion {
+    vcorp_trusted;
+  };
+
+  allow-query-cache {
+    vcorp_trusted;
+  };
+
+  allow-transfer {
+    none;
+  };
+
+  forwarders {
+{% for forwarder in bind_forwarders %}
+    {{ forwarder }};
+{% endfor %}
+  };
+
+  forward only;
+
+  dnssec-validation auto;
+  minimal-responses yes;
+
+  version "not disclosed";
+};

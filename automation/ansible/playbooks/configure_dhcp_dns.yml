@@ -1,11 +1,19 @@
 ---
 - name: Instalar y configurar Kea DHCP en dhcp01
-  hosts: servidores_dhcp
+  hosts: kea_dhcp
   become: true
   gather_facts: true
 
   roles:
     - role: kea_dhcp
+
+- name: Instalar y configurar BIND9 en dns01
+  hosts: bind_dns
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: bind_dns
 
 - name: Configurar los relés DHCP en RouterOS
   hosts: routeros

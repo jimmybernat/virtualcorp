@@ -82,3 +82,20 @@ variable "ssh_public_key_files" {
     "../../../configs/ssh/vcorp_sysadmin.pub"
   ]
 }
+variable "dns01_vm_id" {
+  description = "Identificador del contenedor dns01"
+  type        = number
+  default     = 202
+}
+
+variable "dns01_hostname" {
+  description = "Hostname del servidor DNS"
+  type        = string
+  default     = "dns01"
+}
+
+variable "dns01_mac_address" {
+  description = "MAC local y fija utilizada por la reserva DHCP de dns01"
+  type        = string
+  default     = "02:00:00:00:00:89"
+}

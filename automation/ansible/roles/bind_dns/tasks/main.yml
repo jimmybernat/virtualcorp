@@ -1,0 +1,91 @@
+---
+- name: Comprobar las variables obligatorias de BIND9
+  ansible.builtin.assert:
+    that:
+      - bind_listen_ipv4 | length > 0
+      - bind_forwarders | length > 0
+      - bind_trusted_networks | length > 0
+      - bind_zones | length > 0
+    fail_msg: La configuración de BIND9 está incompleta
+
+- name: Instalar BIND9 y sus utilidades
+  ansible.builtin.apt:
+    name: "{{ bind_packages }}"
+    state: present
+    update_cache: true
+
+- name: Crear el directorio de configuración adicional de BIND9
+  ansible.builtin.file:
+    path: /etc/systemd/system/named.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Esperar a la IP reservada antes de iniciar BIND9
+  ansible.builtin.template:
+    src: network-ready.conf.j2
+    dest: /etc/systemd/system/named.service.d/network-ready.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Recargar BIND9
+
+- name: Crear el directorio de zonas
+  ansible.builtin.file:
+    path: "{{ bind_zone_dir }}"
+    state: directory
+    owner: root
+    group: bind
+    mode: "0750"
+
+- name: Generar las opciones globales de BIND9
+  ansible.builtin.template:
+    src: named.conf.options.j2
+    dest: "{{ bind_options_file }}"
+    owner: root
+    group: bind
+    mode: "0640"
+    validate: "/usr/bin/named-checkconf %s"
+  notify: Recargar BIND9
+
+- name: Generar y validar los archivos de zona
+  ansible.builtin.template:
+    src: db.zone.j2
+    dest: "{{ bind_zone_dir }}/{{ item.filename }}"
+    owner: root
+    group: bind
+    mode: "0640"
+    validate: "/usr/bin/named-checkzone {{ item.name }} %s"
+  loop: "{{ bind_zones }}"
+  loop_control:
+    label: "{{ item.name }}"
+  vars:
+    zone: "{{ item }}"
+  notify: Recargar BIND9
+
+- name: Generar la declaración de zonas
+  ansible.builtin.template:
+    src: named.conf.local.j2
+    dest: "{{ bind_local_file }}"
+    owner: root
+    group: bind
+    mode: "0640"
+  notify: Recargar BIND9
+
+- name: Validar la configuración completa y cargar las zonas
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/named-checkconf
+      - -z
+      - /etc/bind/named.conf
+  changed_when: false
+
+- name: Habilitar e iniciar BIND9
+  ansible.builtin.service:
+    name: "{{ bind_service }}"
+    enabled: true
+    state: started
+
+- name: Ejecutar ahora los handlers pendientes
+  ansible.builtin.meta: flush_handlers

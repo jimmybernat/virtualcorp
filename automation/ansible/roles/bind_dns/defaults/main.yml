@@ -1,0 +1,25 @@
+---
+bind_packages:
+  - bind9
+  - bind9-utils
+  - dnsutils
+
+bind_service: named
+
+bind_config_dir: /etc/bind
+bind_zone_dir: /etc/bind/zones
+
+bind_options_file: /etc/bind/named.conf.options
+bind_local_file: /etc/bind/named.conf.local
+
+bind_listen_ipv4: 10.21.0.137
+
+bind_forwarders:
+  - 8.8.8.8
+
+bind_zone_ttl: 3600
+bind_zone_serial: 2026112601
+bind_soa_refresh: 3600
+bind_soa_retry: 900
+bind_soa_expire: 1209600
+bind_soa_negative_ttl: 300

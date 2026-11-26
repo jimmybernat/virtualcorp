@@ -31,3 +31,7 @@ wireguard_authorized_networks:
   - 10.21.3.128/25
 
 wireguard_firewall_address_list: vcorp-vpn-authorized
+# Direcciones reservadas para servicios Terraform configurados por DHCP
+terraform_service_ip_assignments:
+  - hostname: dns01
+    ip_address: 10.21.0.137

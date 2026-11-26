@@ -1,0 +1,6 @@
+[Unit]
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+ExecStartPre=/usr/bin/timeout 30 /bin/sh -c 'until /usr/sbin/ip -4 address show dev {{ kea_interfaz }} | /usr/bin/grep -q "inet "; do /usr/bin/sleep 1; done'

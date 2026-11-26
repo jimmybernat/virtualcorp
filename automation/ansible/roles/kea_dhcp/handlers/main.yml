@@ -1,5 +1,11 @@
 ---
-- name: Reiniciar Kea DHCPv4
+- name: Recargar la configuración de systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: Reiniciar Kea DHCPv4
+
+- name: Reiniciar el servicio Kea DHCPv4
   ansible.builtin.service:
     name: "{{ kea_servicio }}"
     state: restarted
+  listen: Reiniciar Kea DHCPv4

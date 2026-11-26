@@ -1,0 +1,19 @@
+{% for zone in bind_zones %}
+zone "{{ zone.name }}" {
+  type primary;
+  file "{{ bind_zone_dir }}/{{ zone.filename }}";
+
+  allow-query {
+    vcorp_trusted;
+  };
+
+  allow-transfer {
+    none;
+  };
+
+  allow-update {
+    none;
+  };
+};
+
+{% endfor %}

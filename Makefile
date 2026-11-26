@@ -15,7 +15,7 @@ BOOTSTRAP_DIR := $(PROJECT_ROOT)/automation/scripts/bootstrap
 TERRAFORM_DHCP_DIR := $(PROJECT_ROOT)/infrastructure/terraform/proxmox
 ANSIBLE_DIR := $(PROJECT_ROOT)/automation/ansible
 
-.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box create_templates deploy_equipment deploy_dhcp
+.PHONY: help deploy-routers delete-routers reset-routers reset_routers ssh-keys routeros-box create_templates deploy_equipment deploy_dhcp deploy_dns
 help:
 	@printf '%s\n' \
 	  'Targets:' \
@@ -25,7 +25,9 @@ help:
 	  '  ssh-keys        Generate the project SSH keys' \
 	  '  routeros-box    Build the RouterOS Vagrant box'\
 	  '  create_templates Create the Debian Server and Desktop templates'\
-	  '  deploy_dhcp     Deploy dhcp01, Kea DHCP and RouterOS relays'
+	  '  deploy_dhcp     Deploy dhcp01, Kea DHCP and RouterOS relays'\
+	  '  deploy_dhcp    Deploy dhcp01, Kea DHCP and RouterOS relays' \
+	  '  deploy_dns     Deploy dns01, BIND9 and its DHCP integration'
 
 deploy-routers:
 	"$(BASH_DIR)/deploy_routers.sh"
@@ -60,3 +62,5 @@ deploy_dhcp:
 	cd "$(ANSIBLE_DIR)" && ansible-galaxy collection install -r requirements.yml
 	cd "$(ANSIBLE_DIR)" && ansible-playbook --syntax-check playbooks/configure_dhcp_dns.yml
 	cd "$(ANSIBLE_DIR)" && ansible-playbook playbooks/configure_dhcp_dns.yml
+# DNS comparte el proyecto Terraform y el playbook con DHCP.
+deploy_dns: deploy_dhcp

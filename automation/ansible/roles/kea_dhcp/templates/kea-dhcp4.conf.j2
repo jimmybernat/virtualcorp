@@ -1,9 +1,7 @@
 {
   "Dhcp4": {
     "interfaces-config": {
-      "interfaces": [ "{{ kea_interfaz }}" ],
-      "service-sockets-max-retries": 12,
-      "service-sockets-retry-wait-time": 5000
+      "interfaces": [ "{{ kea_interfaz }}" ]
     },
 
     "lease-database": {
@@ -15,6 +13,8 @@
 
     "subnet4": [
 {% for red in kea_subredes %}
+{% set terraform_reservas = kea_terraform_reservations | selectattr("network", "equalto", red.nombre) | list %}
+{% set reservas_completas = (red.reservas | default([])) + terraform_reservas %}
       {
         "id": {{ red.id }},
         "subnet": "{{ red.subred }}",
@@ -43,7 +43,7 @@
         "reservations-out-of-pool": true,
 
         "reservations": [
-{% for reserva in red.reservas %}
+{% for reserva in reservas_completas %}
           {
             "hostname": "{{ reserva.hostname }}",
             "hw-address": "{{ reserva.mac }}",

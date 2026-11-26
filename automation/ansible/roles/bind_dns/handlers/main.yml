@@ -1,0 +1,20 @@
+---
+- name: Recargar la configuración de systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+  listen: Recargar BIND9
+
+- name: Validar BIND9 antes de recargar
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/named-checkconf
+      - -z
+      - /etc/bind/named.conf
+  changed_when: false
+  listen: Recargar BIND9
+
+- name: Recargar BIND9
+  ansible.builtin.service:
+    name: "{{ bind_service }}"
+    state: reloaded
+  listen: Recargar BIND9

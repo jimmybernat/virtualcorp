@@ -2,7 +2,7 @@
 kea_interfaz: eth0
 kea_dns:
   - 10.21.0.137
-kea_dominio: virtualcorp.local
+kea_dominio: jq-virtualcorp.lan
 
 kea_subredes:
   - id: 1

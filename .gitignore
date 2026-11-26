@@ -208,3 +208,5 @@ __pycache__/
 venv/
 .venv/
 
+# Inventario de servicios generado por Terraform
+automation/ansible/inventories/proxmox_lxc.yml
